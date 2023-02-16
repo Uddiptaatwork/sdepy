@@ -260,10 +260,7 @@ def test_kfunc_params():
     # -------
 
     def kf(cls):
-        if iskfunc(cls):
-            return cls
-        else:
-            return kfunc(cls)
+        return cls if iskfunc(cls) else kfunc(cls)
 
     for X in (sp.wiener_source, sp.dw):
         assert_(kf(X)(paths=2).params ==

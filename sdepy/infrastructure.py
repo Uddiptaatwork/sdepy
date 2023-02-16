@@ -136,10 +136,8 @@ def _const_rho_to_corr(rho):
     n = rho.size
     if rho.shape not in {(), (n,), (n, 1)}:
         raise ValueError(
-            "correlation ``rho`` should be a vector, "
-            "possibly with a trailing 1-dimensional axis matching "
-            "the paths axis, not an array with shape {}"
-            .format(rho.shape))
+            f"correlation ``rho`` should be a vector, possibly with a trailing 1-dimensional axis matching the paths axis, not an array with shape {rho.shape}"
+        )
     elif n == 1:
         rho = rho.reshape(())
         return np.array(((1, rho), (rho, 1)))
@@ -171,27 +169,29 @@ def _get_corr_matrix(corr, rho):
         # if present, corr overrides rho
         corr = _variable_param_setup(corr)
         cshape = _get_param_shape(corr)
-        if cshape is not None:
-            if len(cshape) not in (2, 3) or cshape[0] != cshape[1] or \
-               (len(cshape) == 3 and cshape[2] != 1):
-                raise ValueError(
-                    "the correlation matrix ``corr`` should be square, "
-                    "possibly with a trailing 1-dimensional axis matching "
-                    "the paths axis, not an array with shape {}"
-                    .format(cshape))
+        if cshape is not None and (
+            len(cshape) not in (2, 3)
+            or cshape[0] != cshape[1]
+            or (len(cshape) == 3 and cshape[2] != 1)
+        ):
+            raise ValueError(
+                "the correlation matrix ``corr`` should be square, "
+                "possibly with a trailing 1-dimensional axis matching "
+                "the paths axis, not an array with shape {}"
+                .format(cshape))
     else:
         # corr is None: build correlation matrix from rho,
         # either statically or dynamically
         rho = _variable_param_setup(rho)
         rho_shape = _get_param_shape(rho)
-        if rho_shape is not None:
-            if len(rho_shape) > 2 or \
-               (len(rho_shape) == 2 and rho_shape[1] != 1):
-                raise ValueError(
-                    "correlation ``rho`` should be a vector, "
-                    "possibly with a trailing 1-dimensional axis matching "
-                    "the paths axis, not an array with shape {}"
-                    .format(rho.shape))
+        if rho_shape is not None and (
+            len(rho_shape) > 2 or (len(rho_shape) == 2 and rho_shape[1] != 1)
+        ):
+            raise ValueError(
+                "correlation ``rho`` should be a vector, "
+                "possibly with a trailing 1-dimensional axis matching "
+                "the paths axis, not an array with shape {}"
+                .format(rho.shape))
         if callable(rho):
 
             def corr(t):
@@ -209,27 +209,26 @@ def _get_corr_matrix(corr, rho):
 def _check_source(src, paths, vshape):
     """Checks (non exaustive) on the validity of a stochasticity source."""
     # check compliance with the source protocol
-    if callable(src) and hasattr(src, 'paths') and hasattr(src, 'vshape'):
-        # check paths and vshape
-        paths_ok = (src.paths == paths)
-        try:
-            vshape_ok = True
-            np.broadcast_to(np.empty(src.vshape), vshape)
-        except ValueError:
-            vshape_ok = False
-        if not paths_ok or not vshape_ok:
-            raise ValueError(
-                'invalid stochasticity source: '
-                'expecting soruce paths={} and vshape broadcastable to {}, '
-                'but paths={}, vshape={} were found'
-                .format(paths, vshape, src.paths, src.vshape))
-        return
-    else:
+    if (
+        not callable(src)
+        or not hasattr(src, 'paths')
+        or not hasattr(src, 'vshape')
+    ):
         raise ValueError(
-            "stochasticity source of type '{}', not compliant with the "
-            'source protocol (should be callable with properly '
-            'defined paths and vshape attributes)'
-            .format(type(src).__name__))
+            f"stochasticity source of type '{type(src).__name__}', not compliant with the source protocol (should be callable with properly defined paths and vshape attributes)"
+        )
+    # check paths and vshape
+    paths_ok = (src.paths == paths)
+    try:
+        vshape_ok = True
+        np.broadcast_to(np.empty(src.vshape), vshape)
+    except ValueError:
+        vshape_ok = False
+    if not paths_ok or not vshape_ok:
+        raise ValueError(
+            f'invalid stochasticity source: expecting soruce paths={paths} and vshape broadcastable to {vshape}, but paths={src.paths}, vshape={src.vshape} were found'
+        )
+    return
 
 
 def _source_setup(dz, source_type, paths, vshape, **args):
@@ -424,8 +423,9 @@ class process(np.ndarray):
 
         t = np.asarray(t)
         if t.ndim > 1 or t.size == 0:
-            raise ValueError('the shape of a process timeline should be '
-                             '() or (n,), not {}'.format(t.shape))
+            raise ValueError(
+                f'the shape of a process timeline should be () or (n,), not {t.shape}'
+            )
         if t.ndim == 0:
             t = t.reshape(1)
 
@@ -447,9 +447,9 @@ class process(np.ndarray):
             assert False
 
         if t.shape != x.shape[:1]:
-            raise ValueError('process could not be created from timeline t '
-                             'shaped {} and body shaped {}'
-                             .format(t.shape, x.shape))
+            raise ValueError(
+                f'process could not be created from timeline t shaped {t.shape} and body shaped {x.shape}'
+            )
 
         obj = x.view(cls)
         obj.t = t
@@ -471,20 +471,16 @@ class process(np.ndarray):
         return t_compatible and vp_compatible
 
     def __array_finalize__(self, obj):
-        if obj is None:
+        if obj is None or not isinstance(obj, process):
             # this should never be triggered
             self.t = None
-        elif isinstance(obj, process):
-            # handle new from template
-            if not hasattr(obj, 't') or obj.t.shape != self.shape[:1]:
-                self.t = None
-            else:
-                self.t = obj.t
         else:
-            # view casting - unsafe unless
-            # self.t is taken care of afterwards
-            self.t = None
-            pass
+            # handle new from template
+            self.t = (
+                None
+                if not hasattr(obj, 't') or obj.t.shape != self.shape[:1]
+                else obj.t
+            )
 
     def __array_prepare__(self, out_array, context):
         ufunc, inputs, domain = context
@@ -499,9 +495,8 @@ class process(np.ndarray):
                         'try using their array views instead (x attribute)')
                 if not a._is_compatible(self):
                     raise ValueError(
-                        'processes could not be broadcast '
-                        'together due to incompatible shapes {}, {} and/or '
-                        'timelines'.format(a.shape, self.shape))
+                        f'processes could not be broadcast together due to incompatible shapes {a.shape}, {self.shape} and/or timelines'
+                    )
         return out_array
 
     def __array_wrap__(self, out_array, context=None):
@@ -512,30 +507,23 @@ class process(np.ndarray):
             # needed to comply with the no overriding commitment
             # for numpy.ndarray methods
             return out_array
-        else:
-            ufunc, inputs, domain = context
-            assert hasattr(self, 't')
-            assert any(self is a for a in inputs)
+        ufunc, inputs, domain = context
+        assert hasattr(self, 't')
+        assert any(self is a for a in inputs)
 
-            # get process inputs
-            p_inputs = [a for a in inputs
-                        if isinstance(a, process)]
+        # get process inputs
+        p_inputs = [a for a in inputs
+                    if isinstance(a, process)]
 
-            # ??? overcautious - to be eliminated
-            for a in p_inputs:
-                if not self._is_compatible(a):
-                    assert False, 'this should never occur - '\
+        # ??? overcautious - to be eliminated
+        for a in p_inputs:
+            if not self._is_compatible(a):
+                assert False, 'this should never occur - '\
                            '__array_prepare__ should enforce compatibility'
 
-            # set t to the common non constant timeline
-            # or to the constant timeline of the first input
-            t = p_inputs[0].t
-            for a in p_inputs[1:]:
-                if len(a.t) > 1:
-                    t = a.t
-                    break
-            cls = type(self)
-            return cls(t=t, x=out_array)
+        t = next((a.t for a in p_inputs[1:] if len(a.t) > 1), p_inputs[0].t)
+        cls = type(self)
+        return cls(t=t, x=out_array)
 
     # -------------
     # interpolation
@@ -628,9 +616,8 @@ class process(np.ndarray):
         f = self.interp(kind=kind)
         if ds is None:
             return f(s)
-        else:
-            ds = np.asarray(ds)
-            return f(s+ds) - f(s)
+        ds = np.asarray(ds)
+        return f(s+ds) - f(s)
 
     def rebase(self, t, *, kind=None):
         """Change the process timeline to t, using interpolation.
@@ -654,21 +641,19 @@ class process(np.ndarray):
         """See documentation of the process class."""
         x = self.view(np.ndarray)
         cls = type(self)
-        colon = (slice(None),)
-
         # handle general indexing of self as a ndarray
         #
-        if not isinstance(key, (tuple, str)):
+        if (
+            not isinstance(key, (tuple, str))
+            or not isinstance(key, str)
+            and len(key) != 0
+            and not isinstance(key[0], str)
+        ):
             return x[key]  # standard indexing with integer or array key
         elif isinstance(key, str):
             key = (key,)  # special indexing with empty index (handled below)
         elif len(key) == 0:
             return x[()]  # standard indexing with empty key
-        elif isinstance(key[0], str):
-            pass  # special indexing with non-empty index (handled below)
-        else:
-            return x[key]  # ordinary indexing, key is a tuple
-
         # at this point key is a tuple, and key[0] is a str containing
         # a special indexing flag
 
@@ -687,6 +672,8 @@ class process(np.ndarray):
                              'unsupported indexing mode ' + repr(a))
         # 'v' modes - values indexing
         if a == 'v':
+            colon = (slice(None),)
+
             return cls(self.t, x=x[colon + key + colon])
         # 't' and 'p' modes - timeline an paths indexing
         assert len(key) <= 1  # only one index is expected
@@ -694,11 +681,11 @@ class process(np.ndarray):
             # an integer index is treated as a slice of 1
             i = key[0]
             key = (slice(i, None, None),) if i == -1 else \
-                  (slice(i, i+1, None),)
-        if a == 't':
-            return cls(self.t[key], x=x[key])
-        elif a == 'p':
+                      (slice(i, i+1, None),)
+        if a == 'p':
             return cls(self.t, x=x[(Ellipsis,) + key])
+        elif a == 't':
+            return cls(self.t[key], x=x[key])
         else:
             assert False
 
@@ -734,7 +721,7 @@ class process(np.ndarray):
         the process values and paths across time.
         """
         t = self.t
-        return t.reshape(t.shape + tuple(1 for i in self.shape[1:]))
+        return t.reshape(t.shape + tuple(1 for _ in self.shape[1:]))
 
     @property
     def dt(self):
@@ -791,10 +778,9 @@ class process(np.ndarray):
         h = len(vshape)  # length of target vshape
         if h > k:
             newshape = self.shape[:1] + (1,)*(h-k) + self.shape[1:]
+        elif h < k and set(self.shape[1:k-h+1]) != {1}:
+            raise ValueError(f'could not reshape {self.vshape} process values as {vshape}')
         else:
-            if h < k and set(self.shape[1:k-h+1]) != {1}:
-                raise ValueError('could not reshape {} process values as {}'
-                                 .format(self.vshape, vshape))
             newshape = self.shape[:1] + self.shape[k-h+1:]
         return cls(self.t, x=self.view(np.ndarray).reshape(newshape))
 
@@ -1273,8 +1259,8 @@ def piecewise(t=0., *, x=None, v=None, dtype=None, mode='mid'):
             y[-1] = x[-1]
         else:
             raise ValueError(
-                "mode should be one of 'mid', 'forward', 'backward', "
-                'but {} was given'.format(mode))
+                f"mode should be one of 'mid', 'forward', 'backward', but {mode} was given"
+            )
 
     p = process(s, x=y, dtype=dtype)
     p.interp_kind = 'nearest'
@@ -1489,16 +1475,14 @@ class wiener_source(source):
             # if a correlation matrix was given, check shapes if possible
             if self.vshape == ():
                 raise ValueError(
-                    'if vshape is (), no correlations apply, but '
-                    'corr={}, rho={} were given'
-                    .format(corr, rho))
+                    f'if vshape is (), no correlations apply, but corr={corr}, rho={rho} were given'
+                )
             elif cshape is not None:
                 if cshape[:2] != 2*vshape[-1:] or \
-                   (len(cshape) == 3 and cshape[-1] != 1):
+                       (len(cshape) == 3 and cshape[-1] != 1):
                     raise ValueError(
-                        'cannot instantiate a Wiener source with '
-                        'values shape {} and correlation matrix shape {}'
-                        .format(vshape, cshape))
+                        f'cannot instantiate a Wiener source with values shape {vshape} and correlation matrix shape {cshape}'
+                    )
 
     def __call__(self, t, dt):
         """See wiener_source class documentation."""
@@ -1525,9 +1509,7 @@ class wiener_source(source):
                 cov = corr
                 if cov.ndim == 3:
                     if cov.shape[2] != 1:
-                        raise ValueError(
-                            'invalid correlation matrix shape {}'
-                            .format(cov.shape))
+                        raise ValueError(f'invalid correlation matrix shape {cov.shape}')
                     cov = cov[..., 0]  # remove paths axis if present
                 dz = self.rng.multivariate_normal(
                     mean=mean, cov=cov, size=tshape + vshape[:-1] + (paths,)
@@ -1541,9 +1523,7 @@ class wiener_source(source):
                     # this approximates (integral of corr(t) from t to t+dt)/dt
                     if cov.ndim == 3:
                         if cov.shape[2] != 1:
-                            raise ValueError(
-                                'invalid correlation matrix shape {}'
-                                .format(cov.shape))
+                            raise ValueError(f'invalid correlation matrix shape {cov.shape}')
                         cov = cov[..., 0]  # remove paths axis if present
                     dz[i] = self.rng.multivariate_normal(
                         mean=mean, cov=cov, size=vshape[:-1] + (paths,)
@@ -1609,10 +1589,8 @@ class poisson_source(source):
                                 self.vshape + (paths,))
             except ValueError:
                 raise ValueError(
-                    'cannot broadcast lambda parameter shaped {} to'
-                    'requested poisson source shape = vshape + (paths,) = {}'
-                    .format(self.lam.shape, self.vshape + (paths,))
-                    )
+                    f'cannot broadcast lambda parameter shaped {self.lam.shape} torequested poisson source shape = vshape + (paths,) = {self.vshape + (paths, )}'
+                )
 
     def __call__(self, t, dt):
         """See poisson_source class documentation."""
@@ -1871,8 +1849,7 @@ def _exp_mean(rv, eps=0.00001):
     computed via ``rv.expect``.
     """
     lb, ub = rv.ppf(eps), rv.ppf(1 - eps)
-    exp_mean = rv.expect(lambda x: exp(x), lb=lb, ub=ub)
-    return exp_mean
+    return rv.expect(lambda x: exp(x), lb=lb, ub=ub)
 
 
 # Compound Poisson stochasticity source
@@ -2053,18 +2030,19 @@ def _antithetics(source_class, transform):
     of source_class.
     """
 
+
+
     class antithetics_class(source):
         def __init__(self, *, paths=2, vshape=(),
-                     dtype=None, rng=None, **args):
+                             dtype=None, rng=None, **args):
             if paths % 2:
                 raise ValueError(
-                    'the number of paths for sources with antithetics '
-                    'should be even, not {}'.format(paths))
+                    f'the number of paths for sources with antithetics should be even, not {paths}'
+                )
             self._dz = source_class(paths=paths//2, vshape=vshape,
                                     dtype=dtype, rng=rng, **args)
 
-        __init__.__doc__ = ("See {} class documentation"
-                            .format(source_class.__name__))
+        __init__.__doc__ = f"See {source_class.__name__} class documentation"
 
         def __call__(self, t, dt=None):
             dz = self._dz(t, dt)
@@ -2085,6 +2063,7 @@ def _antithetics(source_class, transform):
         @property
         def rng(self):
             return self._dz.rng
+
 
     return antithetics_class
 
@@ -2481,22 +2460,19 @@ dw, source of standard Wiener process (brownian motion) increments with memory.
             t2, t1 = t1, t2
         assert t0 <= t1 < s < t2 or t2 < s < t1 <= t0
 
+        a, b = (s - t1), (t2 - s)
         # hack - override self._dw correlations to the needed value
         # (avoid instantiating a new wiener_source at each call)
         if callable(corr):
-            a, b = (s - t1), (t2 - s)
             A, B = corr((t1+s)/2)*a, corr((s+t2)/2)*b
             Z = B @ np.linalg.inv(A + B)
             Id = np.eye(A.shape[0])
             dw.corr = (Z @ A)*np.sign(a)
-            ws = self._mult(Z, w1) + self._mult((Id - Z), w2) + dw(0, 1)
+            return self._mult(Z, w1) + self._mult((Id - Z), w2) + dw(0, 1)
         else:
-            a, b = (s - t1), (t2 - s)
             z = b/(a + b)
             dw.corr = corr
-            ws = z*w1 + (1 - z)*w2 + dw(0, z*a)
-
-        return ws
+            return z*w1 + (1 - z)*w2 + dw(0, z*a)
 
 
 class true_poisson_source(true_source):
@@ -2655,11 +2631,10 @@ class true_cpoisson_source(true_source):
         j, y_value = z
         dj = self._dj(t, s - t)
         y_new = self._dj.y_value
-        if s > t:
-            z[1] = y_new
-            return [j + dj, None]
-        else:
+        if s <= t:
             return [j + dj, y_new]
+        z[1] = y_new
+        return [j + dj, None]
 
     def new_inside(self, z1, z2, t1, t2, s):
         j1, y1_value = z1
@@ -2899,15 +2874,12 @@ class montecarlo:
         # to sample[N+k])
         use = self._use
         if use not in ('all', 'even', 'odd'):
-            raise ValueError(
-                "use must be one of 'all', 'even', 'odd', not {}"
-                .format(use))
+            raise ValueError(f"use must be one of 'all', 'even', 'odd', not {use}")
         if use != 'all':
             if sample_paths % 2:
                 raise ValueError(
-                    'the sample axis for even or odd antithetics sampling '
-                    'should be of even length, but {} was found'
-                    .format(sample_paths))
+                    f'the sample axis for even or odd antithetics sampling should be of even length, but {sample_paths} was found'
+                )
             sample_paths //= 2
             sign = 1 if use == 'even' else -1
             sample = (sample[..., :sample_paths] +
@@ -2928,8 +2900,7 @@ class montecarlo:
             dtype = ((sample.dtype if sample.dtype.kind == 'f'
                       else float) if self.dtype is None
                      else self.dtype)
-            self._moments = tuple(np.zeros(vshape, dtype=dtype)
-                                  for i in range(max_moment))
+            self._moments = tuple(np.zeros(vshape, dtype=dtype) for _ in range(max_moment))
             self._mean = np.zeros(vshape, dtype=dtype)
             self._center = sample.mean(axis=-1).astype(dtype)
 
@@ -2937,8 +2908,7 @@ class montecarlo:
         N, M = self.paths, sample.shape[-1]
 
         # allocate memory
-        s = tuple(np.zeros(sample.shape, float)
-                  for k in range(max_moment))
+        s = tuple(np.zeros(sample.shape, float) for _ in range(max_moment))
 
         # compute powers of (sample - self._center)
         s[0][...] = sample - self._center[..., np.newaxis]
@@ -2950,7 +2920,7 @@ class montecarlo:
         for i in range(max_moment):
             sample_moment = s[i].mean(axis=-1)
             self._moments[i][...] = \
-                (N*self._moments[i] + M*sample_moment)/(N + M)
+                    (N*self._moments[i] + M*sample_moment)/(N + M)
 
         # compute cumulated mean
         self._mean[...] = (N*self._mean + M*sample.mean(axis=-1))/(N + M)
@@ -2985,20 +2955,18 @@ class montecarlo:
             else:
                 # setup if bins are explicitly given (range is ignored)
                 mybins = np.asarray(mybins)
-                if (mybins.shape[:-1] == vshape) or \
-                   (mybins.dtype == object and mybins.shape == vshape):
-                    for i in np.ndindex(vshape):
-                        self._bins[i] = mybins[i]
-                        args[i] = dict(bins=mybins[i])
-                else:
+                if mybins.shape[:-1] != vshape and (
+                    mybins.dtype != object or mybins.shape != vshape
+                ):
                     raise ValueError(
-                        'shape of the bins {} not compatible with '
-                        'the shape {} of sample data points'
-                        .format(mybins.shape, vshape)
-                        )
+                        f'shape of the bins {mybins.shape} not compatible with the shape {vshape} of sample data points'
+                    )
+                for i in np.ndindex(vshape):
+                    self._bins[i] = mybins[i]
+                    args[i] = dict(bins=mybins[i])
             for i in np.ndindex(vshape):
                 self._counts[i], self._bins[i] = \
-                        np.histogram(sample[i], **args[i])
+                            np.histogram(sample[i], **args[i])
                 self._counts[i] = self._counts[i].astype(self.ctype,
                                                          copy=False)
                 self._paths_outside[i] = (N + M - self._counts[i].sum())
@@ -3078,12 +3046,11 @@ class montecarlo:
     def __repr__(self):
         if self.paths == 0:
             return '<empty montecarlo object>'
-        else:
-            mean, err = np.asarray(self.mean()), np.asarray(self.stderr())
-            if mean.size == 1 and err.size == 1:
-                mean = mean.flatten()[0]
-                err = err.flatten()[0]
-            return repr(mean) + ' +/- ' + repr(err)
+        mean, err = np.asarray(self.mean()), np.asarray(self.stderr())
+        if mean.size == 1 and err.size == 1:
+            mean = mean.flatten()[0]
+            err = err.flatten()[0]
+        return f'{repr(mean)} +/- {repr(err)}'
 
     # user access to distribution data
     # --------------------------------
@@ -3100,17 +3067,18 @@ class montecarlo:
             raise ValueError('no distribution data available')
 
         counts, bins = self._counts, self._bins
-        if (counts.dtype == object and counts.size > 1):
-            raise IndexError(
-                'histograms and distributions must be invoked '
-                'on single-valued montecarlo instances; '
-                'use indexing to select the value to be addressed '
-                '(es. ``a[i].histogram()``)'
-                )
-        if (counts.dtype == object and counts.size == 1):
-            assert bins.dtype == object and bins.size == 1
-            counts = counts.flatten()[0]
-            bins = bins.flatten()[0]
+        if counts.dtype == object:
+            if counts.size > 1:
+                raise IndexError(
+                    'histograms and distributions must be invoked '
+                    'on single-valued montecarlo instances; '
+                    'use indexing to select the value to be addressed '
+                    '(es. ``a[i].histogram()``)'
+                    )
+            if counts.size == 1:
+                assert bins.dtype == object and bins.size == 1
+                counts = counts.flatten()[0]
+                bins = bins.flatten()[0]
 
         return counts, bins
 

@@ -70,7 +70,6 @@ def process_constructor(t, paths, vshape, dtype):
     assert_(p.shape == (max(1, tt.size),) + vshape + (1,))
     for i in range(tt.size):
         assert_array_equal(p[i, ..., 0], c.astype(dtype))
-        pass
     assert_(p.dtype == np.dtype(dtype))
 
     # only one of x, v, c
@@ -299,7 +298,7 @@ def process_t_getitem(t, paths, vshape):
     q = p['t', 0]
     verify(q, p.t[:1], p[:1])
     q = p['t', 0:2]
-    verify(q, p.t[0:2], p[0:2])
+    verify(q, p.t[:2], p[:2])
     q = p['t', :-2]
     verify(q, p.t[:-2], p[:-2])
     q = p['t', 2:-2]
@@ -590,17 +589,17 @@ def test_summary():
     # summary across paths
     for f in funcs:
         # test values
-        a = getattr(p, 'p' + f)()
+        a = getattr(p, f'p{f}')()
         b = getattr(np, f)(p, axis=-1)[..., np.newaxis]
         assert_allclose(a, b, rtol=eps(p.dtype))
         # test out parameter
         y = np.full((3, 5, 7, 1), np.nan)
-        a = getattr(p, 'p' + f)(out=y)
+        a = getattr(p, f'p{f}')(out=y)
         assert_(a.base is y)
         assert_allclose(y, b, rtol=eps(p.dtype))
     for f in ('sum', 'mean', 'var', 'std'):
         # test dtype parameter
-        a = getattr(p, 'p' + f)(dtype=np.float32)
+        a = getattr(p, f'p{f}')(dtype=np.float32)
         assert_(a.dtype == np.float32)
     # test ddof parameter for pvar and pstd
     a = p.pvar(ddof=1)
@@ -613,17 +612,17 @@ def test_summary():
     # summary across values
     for f in funcs:
         # test values
-        a = getattr(p, 'v' + f)()
+        a = getattr(p, f'v{f}')()
         b = getattr(np, f)(p, axis=(1, 2))
         assert_allclose(a, b, rtol=eps(p.dtype))
         # test out parameter
         y = np.full((3, 11), np.nan)
-        a = getattr(p, 'v' + f)(out=y)
+        a = getattr(p, f'v{f}')(out=y)
         assert_(a.base is y)
         assert_allclose(b, y, rtol=eps(p.dtype))
     for f in ('sum', 'mean', 'var', 'std'):
         # test dtype parameter
-        a = getattr(p, 'v' + f)(dtype=np.float32)
+        a = getattr(p, f'v{f}')(dtype=np.float32)
         assert_(a.dtype == np.float32)
     # test ddof parameter for pvar and pstd
     a = p.vvar(ddof=1)
@@ -636,17 +635,17 @@ def test_summary():
     # summary along the timeline
     for f in funcs:
         # test values
-        a = getattr(p, 't' + f)()
+        a = getattr(p, f't{f}')()
         b = getattr(np, f)(p, axis=0)[np.newaxis, ...]
         assert_allclose(a, b, rtol=eps(p.dtype))
         # test out parameter
         y = np.full((1, 5, 7, 11), np.nan)
-        a = getattr(p, 't' + f)(out=y)
+        a = getattr(p, f't{f}')(out=y)
         assert_(a.base is y)
         assert_allclose(y, b, rtol=eps(p.dtype))
     for f in ('sum', 'mean', 'var', 'std'):
         # test dtype parameter
-        a = getattr(p, 't' + f)(dtype=np.float32)
+        a = getattr(p, f't{f}')(dtype=np.float32)
         assert_(a.dtype == np.float32)
     # test ddof parameter for tvar and tstd
     a = p.tvar(ddof=1)

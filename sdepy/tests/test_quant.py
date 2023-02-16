@@ -55,11 +55,11 @@ def check_values(context, Xid, t, *tests,
        - save the plot;
        - store realized errors in 'err_realized' dict.
     """
-    prefix = context + '_' + Xid
+    prefix = f'{context}_{Xid}'
 
     for id, x_realized, x_expected in tests:
         assert_(x_expected.shape == x_realized.shape)
-        key = prefix + '_' + id
+        key = f'{prefix}_{id}'
         if mode == 'rel':
             delta = np.abs(x_expected - x_realized)/x_expected
         elif mode == 'wabs':
@@ -72,33 +72,34 @@ def check_values(context, Xid, t, *tests,
         mean_err = delta.mean()
         max_err = delta.max()
         if sdepy._config.VERBOSE:
-            print(f'\n{key + " (mean err, max err)":50}'
-                  f'{mean_err:10.6f} {max_err:10.6f}', end='')
+            print(
+                f'\n{f"{key} (mean err, max err)":50}{mean_err:10.6f} {max_err:10.6f}',
+                end='',
+            )
         assert_quant(mean_err < err_expected[key][0])
         assert_quant(max_err < err_expected[key][1])
         err_realized[key] = (mean_err, max_err)
         if brk == key:
-            raise RuntimeError('a break was set at {}'.format(key))
+            raise RuntimeError(f'a break was set at {key}')
     if sdepy._config.PLOT:
         print('plotting...')
         fig = bfig()
         plots = ((111,), (121, 122), (221, 222, 223,),
                  (221, 222, 223, 224))
-        for plot, (id, x_realized, x_expected) in \
-                zip(plots[len(tests)-1], tests):
+        for plot, (id, x_realized, x_expected) in zip(plots[len(tests)-1], tests):
             plt.subplot(plot)
-            plt.title('{} {}: simulation with {} paths'.format(Xid, id, PATHS))
+            plt.title(f'{Xid} {id}: simulation with {PATHS} paths')
             plt.xlabel(xlabel)
             if 'stats' in fig_id:
                 plt.axis(ymin=0, ymax=1.1*x_expected.max())
             if 'chf' in fig_id:
                 a, b = x_expected.max(), x_expected.min()
                 plt.axis(ymin=1.1*min(0, b), ymax=1.1*max(0, a))
-            plt.plot(t, x_expected, label=id + ' expected')
-            plt.plot(t, x_realized, '--', label=id + ' realized')
+            plt.plot(t, x_expected, label=f'{id} expected')
+            plt.plot(t, x_realized, '--', label=f'{id} realized')
             plt.legend()
         plt.tight_layout()
-        save_figure(fig, prefix + '_' + fig_id)
+        save_figure(fig, f'{prefix}_{fig_id}')
         plt.close(fig)
 
 
@@ -167,8 +168,7 @@ def hw2f_F_wrap2(F):
 def test_quant():
     PATHS = sdepy._config.PATHS
     if sdepy._config.TEST_RNG != 'legacy':
-        tst_quant(context='quant' + str(int(PATHS)),
-                  PATHS=PATHS)
+        tst_quant(context=f'quant{int(PATHS)}', PATHS=PATHS)
     elif PATHS == 100_000:
         tst_quant(context='quant5', PATHS=PATHS)
     elif PATHS == 100:
@@ -228,10 +228,13 @@ def tst_quant(context, PATHS):
              sp.kou_log_pdf, None, sp.kou_log_chf)
 
     cases = (
-        ('wiener2', sp.wiener_process, wiener_F, {**wiener_args,
-                                                  **dict(steps=50)}),
-        ('lognorm2', sp.lognorm_process, lognorm_F, {**lognorm_args,
-                                                     **dict(steps=50)}),
+        ('wiener2', sp.wiener_process, wiener_F, wiener_args | {'steps': 50}),
+        (
+            'lognorm2',
+            sp.lognorm_process,
+            lognorm_F,
+            lognorm_args | {'steps': 50},
+        ),
         ('oruh', sp.ornstein_uhlenbeck_process, oruh_F, oruh_args),
         ('hw2f', hw2f_wrapped, hw2f_F, hw2f_args),
         ('cir', sp.cox_ingersoll_ross_process, cir_F, cir_args),
@@ -239,7 +242,7 @@ def tst_quant(context, PATHS):
         ('heston2', sp.heston_process, heston_F, heston_args),
         ('mjd', sp.merton_jumpdiff_process, mjd_F, mjd_args),
         ('kou', sp.kou_jumpdiff_process, kou_F, kou_args),
-        )
+    )
 
     # do the tests
     # ------------
@@ -264,7 +267,7 @@ def quant_case(case, context, err_expected, err_realized, PATHS):
     - check mean, var, std, pdf, cdf, chf against analytic formulae
     """
     Xid, Xclass, F, args = case
-    prefix = context + '_' + Xid
+    prefix = f'{context}_{Xid}'
 
     def check(t, *tests, fig_id='', mode='rel', xlabel='t', brk=None):
         return check_values(context, Xid, t, *tests,
@@ -299,7 +302,7 @@ def quant_case(case, context, err_expected, err_realized, PATHS):
         plt.title('{}: 30 sample paths'.format(Xid))
         plt.xlabel('t')
         plt.plot(tt, X(tt, paths=30))
-        save_figure(fig, prefix + '_paths')
+        save_figure(fig, f'{prefix}_paths')
         plt.close(fig)
 
     # check mean, std and variance
@@ -363,8 +366,7 @@ def quant_case(case, context, err_expected, err_realized, PATHS):
 def test_params():
     PATHS = sdepy._config.PATHS
     if sdepy._config.TEST_RNG != 'legacy':
-        tst_params(context='params' + str(int(PATHS)),
-                   PATHS=PATHS)
+        tst_params(context=f'params{int(PATHS)}', PATHS=PATHS)
     elif PATHS == 100_000:
         tst_params(context='params5', PATHS=PATHS)
     elif PATHS == 100:
@@ -455,23 +457,51 @@ def tst_params(context, PATHS):
              sp.kou_log_pdf, None, sp.kou_log_chf)
 
     cases_sigma = (
-        ('wiener2_sigma', sp.wiener_process, wiener_F,
-         {**wiener_args_sigma, **dict(steps=50)}, 'sigma'),
-        ('lognorm2_sigma', sp.lognorm_process, lognorm_F,
-         {**lognorm_args_sigma, **dict(steps=50)}, 'sigma'),
-        ('oruh_sigma', sp.ornstein_uhlenbeck_process, oruh_F,
-         oruh_args_sigma, 'sigma'),
-        ('hw2f_sigma', hw2f_wrapped, hw2f_F,
-         hw2f_args_sigma, 'sigma'),
-        ('heston1_sigma', full_heston_wrapped, heston_F,
-         heston_args_sigma, 'sigma'),
-        ('heston2_sigma', sp.heston_process, heston_F,
-         heston_args_sigma, 'sigma'),
-        ('mjd_sigma', sp.merton_jumpdiff_process, mjd_F,
-         mjd_args_sigma, 'sigma'),
-        ('kou_sigma', sp.kou_jumpdiff_process, kou_F,
-         kou_args_sigma, 'sigma'),
-        )
+        (
+            'wiener2_sigma',
+            sp.wiener_process,
+            wiener_F,
+            wiener_args_sigma | {'steps': 50},
+            'sigma',
+        ),
+        (
+            'lognorm2_sigma',
+            sp.lognorm_process,
+            lognorm_F,
+            lognorm_args_sigma | {'steps': 50},
+            'sigma',
+        ),
+        (
+            'oruh_sigma',
+            sp.ornstein_uhlenbeck_process,
+            oruh_F,
+            oruh_args_sigma,
+            'sigma',
+        ),
+        ('hw2f_sigma', hw2f_wrapped, hw2f_F, hw2f_args_sigma, 'sigma'),
+        (
+            'heston1_sigma',
+            full_heston_wrapped,
+            heston_F,
+            heston_args_sigma,
+            'sigma',
+        ),
+        (
+            'heston2_sigma',
+            sp.heston_process,
+            heston_F,
+            heston_args_sigma,
+            'sigma',
+        ),
+        (
+            'mjd_sigma',
+            sp.merton_jumpdiff_process,
+            mjd_F,
+            mjd_args_sigma,
+            'sigma',
+        ),
+        ('kou_sigma', sp.kou_jumpdiff_process, kou_F, kou_args_sigma, 'sigma'),
+    )
 
     cases_other = (
         ('cir_k', sp.cox_ingersoll_ross_process, cir_F,
@@ -593,8 +623,6 @@ def params_case(case, context, err_expected, err_realized, PATHS):
 def test_bs():
     """a bare-bone test on Black-Scholes call and put valuation"""
     rng_setup()
-    err_realized = {}
-
     Kc, Kp = 1.2, 0.6
     T = 2.
     r = 0.05
@@ -607,7 +635,7 @@ def test_bs():
         context = 'blackscholes'
     else:
         PATHS = 100*sdepy._config.PATHS
-        context = 'blackscholes' + str(int(PATHS))
+        context = f'blackscholes{int(PATHS)}'
     print('blackscholes')
 
     X = sp.lognorm_process(mu=r - q, sigma=sigma,
@@ -620,10 +648,12 @@ def test_bs():
         assert_quant(abs(p1 - p2.mean())/p2.stderr() < 3)
     call_err = abs((p1 - p2.mean())/p1)
     call_err_std = abs(p2.stderr()/p1)
-    err_realized['call_value'] = (call_err, call_err_std)
+    err_realized = {'call_value': (call_err, call_err_std)}
     if sdepy._config.VERBOSE:
-        print(f'\n{context + "_call_value (err, std err)":50}'
-              f'{call_err:10.6f} {call_err_std:10.6f}', end='')
+        print(
+            f'\n{f"{context}_call_value (err, std err)":50}{call_err:10.6f} {call_err_std:10.6f}',
+            end='',
+        )
 
     p1 = sp.bsput(Kp, T, **args)
     p2 = sp.montecarlo(np.maximum(Kp - X[-1], 0)*exp(-r*T))
@@ -633,16 +663,17 @@ def test_bs():
     put_err_std = abs(p2.stderr()/p1)
     err_realized['put_value'] = (put_err, put_err_std)
     if sdepy._config.VERBOSE:
-        print(f'\n{context + "_put_value (err, std err)":50}'
-              f'{put_err:10.6f} {put_err_std:10.6f}')
+        print(
+            f'\n{f"{context}_put_value (err, std err)":50}{put_err:10.6f} {put_err_std:10.6f}'
+        )
 
     save_errors(context, err_realized,
                 item1='ERROR', item2='STD_ERROR')
 
     # test bscall_delta and bsput_delta formulae
     eps = 1e-4
-    argsplus = {**args, **dict(x0=1 + eps)}
-    argsminus = {**args, **dict(x0=1 - eps)}
+    argsplus = args | {'x0': 1 + eps}
+    argsminus = args | {'x0': 1 - eps}
     cd1 = sp.bscall_delta(Kc, T, **args),
     cd2 = (sp.bscall(Kc, T, **argsplus) -
            sp.bscall(Kc, T, **argsminus))/(2*eps)

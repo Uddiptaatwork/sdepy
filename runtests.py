@@ -154,15 +154,11 @@ def run_insane(warnings='pass'):
     # needs matplotlib.pyplot to be installed
     # saves realized errors and plots in PACKAGE_DIR/tests/cfr
     print_info()
-    results = []
-
     print('------------------')
     print('RUNNING FULL TESTS')
     print('------------------\n')
 
-    # run default tests
-    results.append(run('fast', warnings=warnings))
-
+    results = [run('fast', warnings=warnings)]
     # run quickguide doctests
     count_quickguide = run_quickguide()
 
@@ -208,7 +204,7 @@ Available commands ('.' is the package home directory):
 for command in (setup_tests, exit_tests,
                 print_info, no_source,
                 run_quickguide, run, run_insane):
-    usage += command.__name__ + '(): ' + command.__doc__ + '\n'
+    usage += f'{command.__name__}(): {command.__doc__}' + '\n'
 
 if __name__ == '__main__':
     cmds = sys.argv[1:]
