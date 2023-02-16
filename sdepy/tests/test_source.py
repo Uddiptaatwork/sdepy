@@ -283,11 +283,11 @@ def test_source_specific():
         s, n = src(0, 100), src.dn_value
         assert_allclose(n*val, s, rtol=eps(s.dtype))
 
+    z0 = 3.
+    t0 = 1.
     # true sources tests
     for cls in (true_wiener_source, true_poisson_source, true_cpoisson_source,
                 true_dw, true_dn, true_dj):
-        z0 = 3.
-        t0 = 1.
         t1 = t0 + 0.2
         src = cls(vshape=(2, 3), paths=10, t0=t0, z0=z0)
         size1 = src.size
@@ -360,7 +360,7 @@ def test_source_true_wiener():
         context = 'true_wiener'
     else:
         PATHS = 100*sdepy._config.PATHS
-        context = 'true_wiener' + str(int(PATHS))
+        context = f'true_wiener{int(PATHS)}'
     print('true_wiener')
 
     def err(a, b):
@@ -404,7 +404,9 @@ def test_source_true_wiener():
                       (err_corr, err_var, err_incr_corr, err_incr_var)):
         err_realized[key] = (np.mean(z), np.max(z))
         if sdepy._config.VERBOSE:
-            print(f'\n{context + "_" + key + " (mean err, max err)":50}'
-                  f'{np.mean(z):10.6f} {np.max(z):10.6f}', end='')
+            print(
+                f'\n{f"{context}_{key} (mean err, max err)":50}{np.mean(z):10.6f} {np.max(z):10.6f}',
+                end='',
+            )
 
     save_errors(context, err_realized)

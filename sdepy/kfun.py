@@ -50,8 +50,8 @@ class _meta(type):
     Metaclass that calls only __new__, not __init__,
     upon instantiation.
     """
-    def __call__(cls, *var, **args):
-        return cls.__new__(cls, *var, **args)
+    def __call__(self, *var, **args):
+        return self.__new__(self, *var, **args)
 
 
 def _kfunc_decorate_class(f):
@@ -75,7 +75,7 @@ def _kfunc_decorate_class(f):
             raise TypeError('class {} has a a customized __new__ method, '
                             'should not be wrapped as a kfunc'
                             .format(f))
-        if not (checkattr('__init__') and checkattr('__call__')):
+        if not checkattr('__init__') or not checkattr('__call__'):
             raise TypeError('wrapping {} as a kfunc, no user defined '
                             '__init__ and/or __call__ methods were found'
                             .format(f))
@@ -87,12 +87,16 @@ def _kfunc_decorate_class(f):
     # get init and call signatures and enforce discipline:
     # - init arguments always passed as keywords
     # - no overlapping between call and init keywords
-    init_signature = [(k, z) for k, z in
-                      inspect.signature(f.__init__).parameters.items()
-                      if not z.kind == z.VAR_KEYWORD][1:]  # discard self
-    call_signature = [(k, z) for k, z in
-                      inspect.signature(f.__call__).parameters.items()
-                      if not z.kind == z.VAR_KEYWORD][1:]  # discard self
+    init_signature = [
+        (k, z)
+        for k, z in inspect.signature(f.__init__).parameters.items()
+        if z.kind != z.VAR_KEYWORD
+    ][1:]
+    call_signature = [
+        (k, z)
+        for k, z in inspect.signature(f.__call__).parameters.items()
+        if z.kind != z.VAR_KEYWORD
+    ][1:]
 
     if any(z.kind != z.KEYWORD_ONLY for k, z in init_signature):
         raise TypeError(
@@ -109,8 +113,8 @@ def _kfunc_decorate_class(f):
             'of its variables (calling arguments)'
             .format(f))
 
-    # create and return a wrapper class as a subclass of f
-    # ----------------------------------------------------
+
+
     @_wraps(f)
     class kfunc_class_wrapper(f, metaclass=_meta):
         """
@@ -149,6 +153,7 @@ def _kfunc_decorate_class(f):
                 return super(cls, self).__call__(*call_vars, **call_args)
             else:
                 return self
+
         __new__.__wrapped__ = f.__init__
 
         @_wraps(f.__call__)
@@ -160,24 +165,25 @@ def _kfunc_decorate_class(f):
             if not init_args:
                 # if no parameters, make a plain call to self
                 return super().__call__(*call_vars, **call_args)
-            else:
-                # merge stored parameters with current ones
-                # (current parameters override stored ones)
-                new_init_args = {**self._kfunc_params, **init_args}
+            # merge stored parameters with current ones
+            # (current parameters override stored ones)
+            new_init_args = {**self._kfunc_params, **init_args}
 
-                # instantiate a derived object with merged parameters
-                cls = type(self)
-                new = object.__new__(cls)
-                new.__init__(**new_init_args)
-                new._kfunc_params = new_init_args
-                new._kfunc_parent = self
+            # instantiate a derived object with merged parameters
+            cls = type(self)
+            new = object.__new__(cls)
+            new.__init__(**new_init_args)
+            new._kfunc_params = new_init_args
+            new._kfunc_parent = self
 
                 # handle evaluation/instantiation
                 # with merged parameters
-                if call_vars or call_args:
-                    return super(cls, new).__call__(*call_vars, **call_args)
-                else:
-                    return new
+            return (
+                super(cls, new).__call__(*call_vars, **call_args)
+                if call_vars or call_args
+                else new
+            )
+
         __call__.__wrapped__ = f.__call__
 
         if issubclass(f, SDE):
@@ -198,6 +204,7 @@ def _kfunc_decorate_class(f):
         # mark the class as wrapped as a kfunc
         _is_kfunc = True
 
+
     return kfunc_class_wrapper
 
 
@@ -211,9 +218,11 @@ def _kfunc_decorate_function(nvar):
             raise SyntaxError('improper use of kfunc decorator - see '
                               'kfunc docstring')
 
-        f_signature = [(k, z) for k, z in
-                       inspect.signature(f).parameters.items()
-                       if not z.kind == z.VAR_KEYWORD]
+        f_signature = [
+            (k, z)
+            for k, z in inspect.signature(f).parameters.items()
+            if z.kind != z.VAR_KEYWORD
+        ]
         if not 0 < nvar <= len(f_signature):
             # avoid unexpected behaviour with nvar <= 0
             raise ValueError('expecting 0 < nvar <= {}, not {}'

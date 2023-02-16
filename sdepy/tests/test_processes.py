@@ -116,11 +116,11 @@ def test_processes():
     # ----------------------------------------
     cls = all_cls + all_shortcuts
     paths, dtype = [1], [None]
-    params = (dict(), dict(vshape=()), dict(vshape=(2,)))
+    params = {}, dict(vshape=()), dict(vshape=(2,))
     do(processes, cls, params, paths, dtype)
 
     paths, dtype = [3], [np.float16]
-    params = (dict(),)
+    params = ({}, )
     do(processes, cls, params, paths, dtype)
 
     paths, dtype = [11], [None]
@@ -483,44 +483,6 @@ def processes(cls, params, paths, dtype):
                     # initial values are the same for all paths
                     assert_((p[i0] == p[i0, ..., 0][..., np.newaxis]).all())
 
-                # extensive test of rng parameter (too slow to be included
-                # in the test suite)
-                if False:
-                    try:
-                        make_rngs = (
-                            np.random.default_rng,
-                            np.random.RandomState,
-                            lambda z: np.random.Generator(
-                                np.random.PCG64(z)),
-                        )
-                    except AttributeError:
-                        continue
-                    SEED = 1234
-                    for make_rng in make_rngs:
-                        rng1 = make_rng(SEED)
-                        rng2 = make_rng(SEED)
-                        assert rng1 is not rng2
-                        if callable(make_params):
-                            params1 = make_params(rng1)
-                            params2 = make_params(rng2)
-                        else:
-                            params1 = params2 = params
-                        P1 = cls(**params1, paths=paths,
-                                 dtype=dtype, rng=rng1,
-                                 steps=steps, i0=i0)
-                        P2 = cls(**params2, paths=paths,
-                                 dtype=dtype, rng=rng2,
-                                 steps=steps, i0=i0)
-                        assert P1.rng is rng1
-                        assert P2.rng is rng2
-                        ps1, ps2 = P1(t), P2(t)
-                        ps1, ps2 = [
-                            ps if isinstance(ps, (tuple, list)) else (ps,)
-                            for ps in (ps1, ps2)]
-                        assert len(ps1) == len(ps2)
-                        for z, w in zip(ps1, ps2):
-                            assert_allclose(z, w)
-
     # check initial conditions on the last computed p
     if cls in {wiener_process, lognorm_process,
                ornstein_uhlenbeck_process,
@@ -583,10 +545,7 @@ def processes(cls, params, paths, dtype):
         # propagates correctly as a default
         tmp = sdepy.infrastructure.default_rng
         sdepy.infrastructure.default_rng = make_rng(SEED)
-        if callable(make_params):
-            params3 = make_params()
-        else:
-            params3 = params
+        params3 = make_params() if callable(make_params) else params
         P3 = cls(**params3, paths=paths, dtype=dtype, rng=None)
         assert P3.rng is sdepy.infrastructure.default_rng
         ps3 = P3(t)
@@ -697,7 +656,7 @@ def test_processes_misc():
     t2 = np.linspace(t0, t0 + DT, 100)
 
     xw_exact = x0 + mu*DT + sigma*dw(t0, DT)
-    xl_exact = x0*exp((mu - sigma*sigma/2)*DT + sigma*dw(t0, DT))
+    xl_exact = x0 * exp((mu - sigma**2 / 2) * DT + sigma*dw(t0, DT))
     xw1, xw2 = pw(t1), pw(t2)
     xl1, xl2 = pl(t1), pl(t2)
 

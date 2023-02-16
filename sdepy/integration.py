@@ -380,9 +380,8 @@ class paths_generator:
         diff = (tt[i] - sw[k]) * (-1 if reverse else 1)
         if diff < 0:  # should never occur
             raise RuntimeError(
-                'invalid path generation step encountered in {}: '
-                'realized s={} is beyond target value t={}'
-                .format(self, sw[k], tt[i]))
+                f'invalid path generation step encountered in {self}: realized s={sw[k]} is beyond target value t={tt[i]}'
+            )
         elif tt[i] == sw[k]:
             self.store(i, k)
             return 1
@@ -449,9 +448,8 @@ class paths_generator:
                         if reverse else sw[-2] < sw[-1] <= target_s)
             if not order_ok:
                 raise RuntimeError(
-                    'invalid path generation step encountered in {}: '
-                    's={} was followed by s+ds={}, beyond requested s+ds={}'
-                    .format(self, sw[-2], sw[-1], target_s))
+                    f'invalid path generation step encountered in {self}: s={sw[-2]} was followed by s+ds={sw[-1]}, beyond requested s+ds={target_s}'
+                )
 
             # invoke cooperative subclass method 'store'
             di = self._store_if_reached(i=i, k=-1)
@@ -498,30 +496,27 @@ class paths_generator:
         # enforce depth >= 2
         if K < 2:
             raise ValueError(
-                'the depth of the integrator algorithm should be '
-                '>= 2, not {}'.format(K))
+                f'the depth of the integrator algorithm should be >= 2, not {K}'
+            )
 
         # preprocess and validate the result's timeline
         # ---------------------------------------------
         tt = np.asarray(timeline)
         if tt.shape != (tt.size,):
             raise ValueError(
-                'the integration timeline should be a one-dimensional array, '
-                'not an array of shape {}'.format(tt.shape))
+                f'the integration timeline should be a one-dimensional array, not an array of shape {tt.shape}'
+            )
         if not np.array_equal(tt, np.unique(tt)):
             raise ValueError(
-                'the integration timeline sholud be '
-                'an array of strictly increasing numbers, '
-                'but {} was given'
-                .format(tt))
+                f'the integration timeline sholud be an array of strictly increasing numbers, but {tt} was given'
+            )
         try:
             if not np.isscalar(tt[i0]):
                 raise IndexError()
         except IndexError:
             raise IndexError(
-                'i0 should be an integer indexing an element of the '
-                'integration timeline, but {} was given'
-                .format(i0))
+                f'i0 should be an integer indexing an element of the integration timeline, but {i0} was given'
+            )
         # NOTE:
         #   if tt is an integer type, the use of floats is forced in
         #   computations. the integer tt is finally passed to self.exit
@@ -538,9 +533,7 @@ class paths_generator:
         steps_tt = np.unique(np.concatenate((target_tt, tt)))
         if len(steps_tt) < K-1:
             raise ValueError(
-                'at least {} time points are needed '
-                'for a paths_generator with depth {}'
-                .format(K-1, K)
+                f'at least {K - 1} time points are needed for a paths_generator with depth {K}'
             )
         # steps_tt consolidates all target integration points and all points
         # in the timeline to be returned
@@ -673,16 +666,13 @@ class integrator(paths_generator):
     """
 
     def _check_integration_method(self, id):
-        if not hasattr(self, id + '_next'):
+        if not hasattr(self, f'{id}_next'):
             raise ValueError(
-                'unrecognized integration method {}: '
-                "use 'euler' "
-                'or provide a properly defined '
-                '`{}_next` integrator class method'
-                .format(id, id))
+                f"unrecognized integration method {id}: use 'euler' or provide a properly defined `{id}_next` integrator class method"
+            )
 
     def _get_integration_method(self, id):
-        return getattr(self, id + '_next')
+        return getattr(self, f'{id}_next')
 
     def __init__(self, *, paths=1,
                  xshape=(), wshape=(),
@@ -968,16 +958,13 @@ class SDE:
     # ------------------------------
 
     def _check_source_id(self, id):
-        if not hasattr(self, 'source_' + id):
+        if not hasattr(self, f'source_{id}'):
             raise ValueError(
-                'unrecognized source {}: '
-                "use one of 'dt', 'dw', 'dn', 'dj', "
-                'or provide a properly defined '
-                'SDE class method `source_{}`'
-                .format(id, id))
+                f"unrecognized source {id}: use one of 'dt', 'dw', 'dn', 'dj', or provide a properly defined SDE class method `source_{id}`"
+            )
 
     def _get_source_setup_method(self, id):
-        return getattr(self, 'source_' + id)
+        return getattr(self, f'source_{id}')
 
     def _get_args(self, keys):
         return {k: z for k, z in self._args.items()
@@ -992,7 +979,7 @@ class SDE:
             self._check_source_id(id)
             source_setup_method = self._get_source_setup_method(id)
             expected_source_args[id] = \
-                dict(_signature(source_setup_method))
+                    dict(_signature(source_setup_method))
         # first two parameters of sde.init are expected to be t and out_x
         expected_init_args = dict(_signature(self.init)[2:])
         # first two parameters of sde callable are expected to be t and x,
@@ -1006,7 +993,7 @@ class SDE:
         for D in (tuple(expected_source_args.values()) +
                   (expected_init_args, expected_sde_args,
                    expected_more_args)):
-            expected_args.update(D)
+            expected_args |= D
         # check for multiple occurrencies of the same expected arg,
         # with different defaults
         defaults = {k: [] for k in expected_args}
@@ -1015,13 +1002,10 @@ class SDE:
                    expected_more_args)):
             for k, z in D.items():
                 defaults[k].append(z)
-        repeated = {k for k in defaults
-                    if len(set(defaults[k])) > 1}
-        if repeated:
+        if repeated := {k for k in defaults if len(set(defaults[k])) > 1}:
             raise TypeError(
-                    'two or more incompatible defaults found '
-                    'for SDE parameter(s) {}'
-                    .format(repeated))
+                f'two or more incompatible defaults found for SDE parameter(s) {repeated}'
+            )
 
         # store arg keys for later use in self._get_args()
         self._source_args_keys = {}
@@ -1043,37 +1027,28 @@ class SDE:
         missing = {k for (k, v) in all_args.items()
                    if v is _empty}
         if unexpected:
-            raise TypeError(
-                'unexpected keyword(s): {}'
-                .format(unexpected))
+            raise TypeError(f'unexpected keyword(s): {unexpected}')
         if missing:
             raise TypeError(
-                'no value and no default found for sde parameter(s) {}'
-                .format(missing))
+                f'no value and no default found for sde parameter(s) {missing}'
+            )
 
         # return a unique dict with all args
         return all_args
 
     def _sde_args_setup(self, sde_args):
-        # convert to array all sde args, preserving optional
-        # time dependence
-        new_sde_args = {k: _variable_param_setup(z)
-                        for (k, z) in sde_args.items()}
-        return new_sde_args
+        return {k: _variable_param_setup(z) for (k, z) in sde_args.items()}
 
     def _init_args_setup(self, init_args):
-        # initialize and convert to array all init args
-        new_init_args = {k: _const_param_setup(z)
-                         for (k, z) in init_args.items()}
-        return new_init_args
+        return {k: _const_param_setup(z) for (k, z) in init_args.items()}
 
     def _sources_setup(self):
-        # initialize stochasticity sources
-        sources = {id:
-                   self._get_source_setup_method(id)(
-                       **self._get_args(self._source_args_keys[id]))
-                   for id in self.sources}
-        return sources
+        return {
+            id: self._get_source_setup_method(id)(
+                **self._get_args(self._source_args_keys[id])
+            )
+            for id in self.sources
+        }
 
     # initialization
     # --------------
@@ -1086,14 +1061,12 @@ class SDE:
 
         if not isinstance(self, integrator):
             raise TypeError(
-                'cannot instantiate SDE subclass {} that is not a subclass '
-                'of a cooperating integrator class'
-                .format(type(self)))
+                f'cannot instantiate SDE subclass {type(self)} that is not a subclass of a cooperating integrator class'
+            )
         elif hasattr(self, 'method'):
             raise TypeError(
-                'improper method resolution order in class {}: '
-                'the integrator class cannot precede the the SDE class'
-                .format(type(self)))
+                f'improper method resolution order in class {type(self)}: the integrator class cannot precede the the SDE class'
+            )
 
         # self.vshape is used by SDEs subclass
         # to force self.addaxis in case vshape == ()
@@ -1203,15 +1176,12 @@ class SDE:
     def _check_sde_values(self, A):
         if not isinstance(A, dict):
             raise TypeError(
-                'invalid {} return values: a dict, not a {} object expected'
-                .format(self.sde, type(A))
-                )
+                f'invalid {self.sde} return values: a dict, not a {type(A)} object expected'
+            )
         if not set(A.keys()).issubset(self.sources):
             raise KeyError(
-                'invalid {} return values: {} entries expected (one per '
-                'stochasticity source), not {}'
-                .format(self.sde, set(self.sources), set(A.keys()))
-                )
+                f'invalid {self.sde} return values: {set(self.sources)} entries expected (one per stochasticity source), not {set(A.keys())}'
+            )
 
     def A(self, t, x):
         """See documentation integrator.A"""
@@ -1683,8 +1653,8 @@ class SDEs(SDE):
     def _inspect_args_defaults(self):
         if self.q < 1:
             raise ValueError(
-                'the number of equations q should be positive, but '
-                '{} was given'.format(self.q))
+                f'the number of equations q should be positive, but {self.q} was given'
+            )
         if self.vshape == ():
             # force adding an axis for equations
             self.addaxis = True
@@ -1697,14 +1667,12 @@ class SDEs(SDE):
     def _check_sde_values(self, As):
         if not isinstance(As, (list, tuple)):
             raise TypeError(
-                'invalid {} return values: a list or tuple of {} dict '
-                '(one per equation) expected, not a {} object'
-                .format(self.sde, self.q, type(As))
-                )
+                f'invalid {self.sde} return values: a list or tuple of {self.q} dict (one per equation) expected, not a {type(As)} object'
+            )
         if len(As) != self.q:
             raise ValueError(
-                'invalid {} return values: {} equations expected, '
-                'not {}'.format(self.sde, self.q, len(As)))
+                f'invalid {self.sde} return values: {self.q} equations expected, not {len(As)}'
+            )
         for a in As:
             super()._check_sde_values(a)
 
@@ -1725,9 +1693,7 @@ class SDEs(SDE):
         A_ids = set()
         for a in As:
             A_ids.update(a.keys())
-        A = {id: self.pack(tuple(a.get(id, 0) for a in As))
-             for id in A_ids}
-        return A
+        return {id: self.pack(tuple(a.get(id, 0) for a in As)) for id in A_ids}
 
     # public interface vs subclasses
     # ------------------------------
@@ -1750,11 +1716,9 @@ class SDEs(SDE):
         """
         q = self.q
         if self.addaxis:
-            xs = tuple(X[..., k, :] for k in range(q))
-        else:
-            d = self.vshape[-1]
-            xs = tuple(X[..., k*d:(k+1)*d, :] for k in range(q))
-        return xs
+            return tuple(X[..., k, :] for k in range(q))
+        d = self.vshape[-1]
+        return tuple(X[..., k*d:(k+1)*d, :] for k in range(q))
 
     def pack(self, xs):
         """Packs the given arrays (one per equation) into a single array.
@@ -1772,15 +1736,10 @@ class SDEs(SDE):
             (the last dimension enumerates paths).
         """
         target_shape = self.vshape + (self.paths,)
-        if self.addaxis:
-            i = np.index_exp[..., np.newaxis, :]
-        else:
-            i = np.index_exp[...]
-        X = np.concatenate(tuple(
-            np.broadcast_to(x, target_shape)[i]
-            for x in xs
-            ), axis=-2)
-        return X
+        i = np.index_exp[..., np.newaxis, :] if self.addaxis else np.index_exp[...]
+        return np.concatenate(
+            tuple(np.broadcast_to(x, target_shape)[i] for x in xs), axis=-2
+        )
 
     def shapes(self, vshape):
         """See documentation of SDE.shapes"""
@@ -1854,9 +1813,7 @@ def _SDE_from_function(f, q=None, sources=None, log=False, addaxis=False):
             except Exception:
                 test_val = f(np.array(1.), np.array(1.))
         except Exception:
-            raise TypeError(
-                'test evaluation of {} failed'
-                .format(f))
+            raise TypeError(f'test evaluation of {f} failed')
         # infer neq, ids and SDE_class from test_val
         if isinstance(test_val, (tuple, list)):
             neq = len(test_val)
@@ -1874,8 +1831,8 @@ def _SDE_from_function(f, q=None, sources=None, log=False, addaxis=False):
         if ((q is not None and neq != q) or
                 (sources is not None and set(sources) != ids)):
             raise TypeError(
-                'test evaluation of {} inconsistent with given '
-                "'q' or 'sources'".format(f))
+                f"test evaluation of {f} inconsistent with given 'q' or 'sources'"
+            )
 
     # avoid namespace conflicts inside SDE_wrapper
     log_flag = log
@@ -2531,10 +2488,7 @@ class heston_SDE(full_heston_SDE):
         return vshape, xshape, wshape
 
     def let(self, s, out_x, x):
-        if self.addaxis:
-            out_x[...] = x[..., 0, :]
-        else:
-            out_x[...] = x[..., :self.vshape[-1], :]
+        out_x[...] = x[..., 0, :] if self.addaxis else x[..., :self.vshape[-1], :]
 
     def result(self, tt, xx):
         np.exp(xx, out=xx)

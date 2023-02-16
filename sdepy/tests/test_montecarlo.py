@@ -43,7 +43,7 @@ def montecarlo_workflow(shape, paths, dtype):
     # print(shape, paths, dtype)
     PATHS = paths
     size = np.empty(shape).size
-    indexes = [i for i in np.ndindex(shape)]
+    indexes = list(np.ndindex(shape))
 
     # cumulate 10 simulations
     a = montecarlo(bins='auto')
@@ -57,7 +57,7 @@ def montecarlo_workflow(shape, paths, dtype):
     # access results
     str(a)
     x = np.linspace(-3*size, 3*size, 100)
-    for k in range(5):
+    for _ in range(5):
         i = (indexes)[-1]
         a[i].pdf(x)  # default
         a[i].pdf(x, bandwidth=.7)  # gaussian kde with explicit bandwidth
@@ -229,7 +229,7 @@ def test_montecarlo_histogram():
         PATHS = 1_000_000
     else:
         PATHS = 100*sdepy._config.PATHS
-        context = context + str(int(PATHS))
+        context += str(int(PATHS))
     RATIO = 20  # ratio of last to first bin in nonlinear bins
     x = np.linspace(0, 1, BINS + 1)
     y = np.full(BINS + 1, RATIO**(1/BINS)).cumprod()
@@ -277,7 +277,7 @@ def test_montecarlo_histogram():
 def montecarlo_histogram(context, test_id, err_expected, err_realized,
                          shape, dist_info, paths, plot):
     dist, support, bins, _ = dist_info[test_id]
-    test_key = context + '_' + test_id
+    test_key = f'{context}_{test_id}'
 
     sample = dist.rvs(size=shape + (paths,), random_state=rng())
     sample_bins = np.empty(shape + bins.shape)
@@ -315,10 +315,9 @@ def montecarlo_histogram(context, test_id, err_expected, err_realized,
         i = tuple(np.where(i)[k][0] for k in range(i.ndim))
         counts, bins = a[i].histogram()
         fig = plt.figure()
-        plt.title(test_key + f', paths={paths}:\n'
-                  f'mean err = {float(mean_err[i]):.5g}, '
-                  f'max err = {float(max_err[i]):.5g}\n'
-                  f'error is conunts diff/mean counts')
+        plt.title(
+            f'{test_key}, paths={paths}:\nmean err = {float(mean_err[i]):.5g}, max err = {float(max_err[i]):.5g}\nerror is conunts diff/mean counts'
+        )
         plot_histogram((expected_counts, bins), color='g',
                        histtype='step', label='expected', lw=2)
         plot_histogram((counts, bins), color='b',
@@ -351,7 +350,7 @@ def test_montecarlo_dist():
         PATHS = 1_000_000
     else:
         PATHS = 100*sdepy._config.PATHS
-        context = context + str(int(PATHS))
+        context += str(int(PATHS))
     RATIO = 10  # ratio of last to first bin in nonlinear bins
     x = np.linspace(0, 1, BINS + 1)
     y = np.full(BINS + 1, RATIO**(1/BINS)).cumprod()
@@ -400,7 +399,7 @@ def test_montecarlo_dist():
 def montecarlo_dist(context, test_id, err_expected, err_realized,
                     shape, dist_info, paths, plot):
     dist, support, bins, _, integral_bounds = dist_info[test_id]
-    test_key = context + '_' + test_id
+    test_key = f'{context}_{test_id}'
 
     # prepare sample
     sample = dist.rvs(size=shape + (paths,), random_state=rng())
@@ -415,9 +414,16 @@ def montecarlo_dist(context, test_id, err_expected, err_realized,
     a.update(sample[..., 2*p:])
 
     # test pdf and cdf values
-    (mean_err_pdf1, max_err_pdf1, mean_err_cdf1, max_err_cdf1,
-     mean_err_pdf2, max_err_pdf2, mean_err_cdf2, max_err_cdf2) = \
-        [np.zeros(a.vshape) for i in range(8)]
+    (
+        mean_err_pdf1,
+        max_err_pdf1,
+        mean_err_cdf1,
+        max_err_cdf1,
+        mean_err_pdf2,
+        max_err_pdf2,
+        mean_err_cdf2,
+        max_err_cdf2,
+    ) = [np.zeros(a.vshape) for _ in range(8)]
     x = np.linspace(bins[0], bins[-1], 10*bins.size)
     true_pdf = dist.pdf(x)
     true_cdf = dist.cdf(x)
@@ -433,14 +439,10 @@ def montecarlo_dist(context, test_id, err_expected, err_realized,
         mean_err_pdf2[i] = delta2.mean()
         max_err_pdf1[i] = delta1.max()
         max_err_pdf2[i] = delta2.max()
-        assert_quant(mean_err_pdf1[i] <
-                     err_expected[test_key + '_pdf_kde'][0])
-        assert_quant(max_err_pdf1[i] <
-                     err_expected[test_key + '_pdf_kde'][1])
-        assert_quant(mean_err_pdf2[i] <
-                     err_expected[test_key + '_pdf_interp'][0])
-        assert_quant(max_err_pdf2[i] <
-                     err_expected[test_key + '_pdf_interp'][1])
+        assert_quant(mean_err_pdf1[i] < err_expected[f'{test_key}_pdf_kde'][0])
+        assert_quant(max_err_pdf1[i] < err_expected[f'{test_key}_pdf_kde'][1])
+        assert_quant(mean_err_pdf2[i] < err_expected[f'{test_key}_pdf_interp'][0])
+        assert_quant(max_err_pdf2[i] < err_expected[f'{test_key}_pdf_interp'][1])
 
         cdf1 = a[i].cdf(x, method='gaussian_kde')
         cdf2 = a[i].cdf(x, method='interp')
@@ -450,24 +452,28 @@ def montecarlo_dist(context, test_id, err_expected, err_realized,
         mean_err_cdf2[i] = delta2.mean()
         max_err_cdf1[i] = delta1.max()
         max_err_cdf2[i] = delta2.max()
-        assert_quant(mean_err_cdf1[i] <
-                     err_expected[test_key + '_cdf_kde'][0])
-        assert_quant(max_err_cdf1[i] <
-                     err_expected[test_key + '_cdf_kde'][1])
-        assert_quant(mean_err_cdf2[i] <
-                     err_expected[test_key + '_cdf_interp'][0])
-        assert_quant(max_err_cdf2[i] <
-                     err_expected[test_key + '_cdf_interp'][1])
+        assert_quant(mean_err_cdf1[i] < err_expected[f'{test_key}_cdf_kde'][0])
+        assert_quant(max_err_cdf1[i] < err_expected[f'{test_key}_cdf_kde'][1])
+        assert_quant(mean_err_cdf2[i] < err_expected[f'{test_key}_cdf_interp'][0])
+        assert_quant(max_err_cdf2[i] < err_expected[f'{test_key}_cdf_interp'][1])
 
     # store realized errors
-    err_realized[test_key + '_pdf_kde'] = (mean_err_pdf1.max(),
-                                           max_err_pdf1.max())
-    err_realized[test_key + '_pdf_interp'] = (mean_err_pdf2.max(),
-                                              max_err_pdf2.max())
-    err_realized[test_key + '_cdf_kde'] = (mean_err_cdf1.max(),
-                                           max_err_cdf1.max())
-    err_realized[test_key + '_cdf_interp'] = (mean_err_cdf2.max(),
-                                              max_err_cdf2.max())
+    err_realized[f'{test_key}_pdf_kde'] = (
+        mean_err_pdf1.max(),
+        max_err_pdf1.max(),
+    )
+    err_realized[f'{test_key}_pdf_interp'] = (
+        mean_err_pdf2.max(),
+        max_err_pdf2.max(),
+    )
+    err_realized[f'{test_key}_cdf_kde'] = (
+        mean_err_cdf1.max(),
+        max_err_cdf1.max(),
+    )
+    err_realized[f'{test_key}_cdf_interp'] = (
+        mean_err_cdf2.max(),
+        max_err_cdf2.max(),
+    )
 
     # test pdf normalization
     for i in np.ndindex(shape):
@@ -479,10 +485,10 @@ def montecarlo_dist(context, test_id, err_expected, err_realized,
             a[i].pdf(y, method='interp'), y)
         err1 = np.abs(integral1 - 1)
         err2 = np.abs(integral2 - 1)
-        assert_quant(err1 < err_expected[test_key + '_integral_kde'][0])
-        assert_quant(err2 < err_expected[test_key + '_integral_lin'][0])
-        err_realized[test_key + '_integral_kde'] = (err1, err1)
-        err_realized[test_key + '_integral_lin'] = (err2, err2)
+        assert_quant(err1 < err_expected[f'{test_key}_integral_kde'][0])
+        assert_quant(err2 < err_expected[f'{test_key}_integral_lin'][0])
+        err_realized[f'{test_key}_integral_kde'] = (err1, err1)
+        err_realized[f'{test_key}_integral_lin'] = (err2, err2)
         break  # test only first for speed
 
     # plot worst case
@@ -496,10 +502,9 @@ def montecarlo_dist(context, test_id, err_expected, err_realized,
         pdf2 = a[i].pdf(x, method='interp')
         counts, bins = a[i].density_histogram()
         fig = plt.figure()
-        plt.title(test_key + f', paths={paths}:\n'
-                  f'mean err = {float(mean_err_pdf1[i]):.5g}, '
-                  f'max err = {float(max_err_pdf1[i]):.5g}\n'
-                  f'error is conunts diff/mean counts')
+        plt.title(
+            f'{test_key}, paths={paths}:\nmean err = {float(mean_err_pdf1[i]):.5g}, max err = {float(max_err_pdf1[i]):.5g}\nerror is conunts diff/mean counts'
+        )
         plot_histogram((counts, bins), color='y',
                        histtype='step', label='realized histogram')
         plt.plot(x, true_pdf, color='g', label='expected pdf', lw=2)
@@ -507,7 +512,7 @@ def montecarlo_dist(context, test_id, err_expected, err_realized,
         plt.plot(x, pdf2, color='r', label='realized pdf - interpolate')
         plt.plot(x, x*0 + mean_pdf, 'c:', label='mean pdf')
         plt.legend()
-        save_figure(plt, test_key + '_pdf')
+        save_figure(plt, f'{test_key}_pdf')
         plt.close(fig)
 
         # plot cdf
@@ -517,10 +522,9 @@ def montecarlo_dist(context, test_id, err_expected, err_realized,
         cdf2 = a[i].cdf(x, method='interp')
         counts, bins = a[i].density_histogram()
         fig = plt.figure()
-        plt.title(test_key + f', paths={paths}:\n'
-                  f'mean err = {float(mean_err_cdf1[i]):.5g}, '
-                  f'max err = {float(max_err_cdf1[i]):.5g}\n'
-                  f'error is conunts diff/mean counts')
+        plt.title(
+            f'{test_key}, paths={paths}:\nmean err = {float(mean_err_cdf1[i]):.5g}, max err = {float(max_err_cdf1[i]):.5g}\nerror is conunts diff/mean counts'
+        )
         plot_histogram(
             hist=(
                 (counts*np.diff(bins)).cumsum(),
@@ -531,5 +535,5 @@ def montecarlo_dist(context, test_id, err_expected, err_realized,
         plt.plot(x, cdf1, color='b', label='realized cdf - gaussian kde')
         plt.plot(x, cdf2, color='r', label='realized cdf - interpolate')
         plt.legend()
-        save_figure(plt, test_key + '_cdf')
+        save_figure(plt, f'{test_key}_cdf')
         plt.close(fig)

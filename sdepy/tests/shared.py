@@ -265,7 +265,7 @@ def load_errors(context, dtype=float):
     if sdepy._config.TEST_RNG != 'legacy':
         return noerrors_expected
 
-    fname = os.path.join(_INPUT_DIR, context + '_err_expected.txt')
+    fname = os.path.join(_INPUT_DIR, f'{context}_err_expected.txt')
     min_error = eps(float)
 
     def err(error):
@@ -288,7 +288,7 @@ def save_errors(context, errors,
                 item1='MEAN_ERROR', item2='MAX_ERROR'):
     DIR = sdepy._config.OUTPUT_DIR
     if DIR is not None:
-        fname = os.path.join(DIR, context + '_err_realized.txt')
+        fname = os.path.join(DIR, f'{context}_err_realized.txt')
         with open(fname, 'w') as f:
             print('{:40} {:>12} {:>12}\n'.format(
                 'TEST_ID', item1, item2), file=f)
@@ -300,7 +300,7 @@ def save_errors(context, errors,
 def save_figure(fig, fig_id):
     DIR = sdepy._config.OUTPUT_DIR
     if DIR is not None:
-        fname = os.path.join(DIR, fig_id + '.png')
+        fname = os.path.join(DIR, f'{fig_id}.png')
         fig.savefig(fname, dpi=300)
 
 

@@ -116,8 +116,6 @@ def getnotebook(in_, out,
                 text += '\n'
             elif len(line[4:]) >= 3 and line[4:7] in ('>>>', '...'):
                 text += line[8:]
-            else:
-                pass  # skip code output
         text = to_code(text)
         nb['cells'].append(nbf.v4.new_code_cell(text))
 
@@ -149,13 +147,13 @@ def quickguide_make(execute=True):
     pathlib.Path('./dist').mkdir(exist_ok=True)
     in_ = './doc/quickguide.rst'
     out_code = './dist/quickguide_code.ipynb'
-    out_executed = './dist/quickguide.ipynb'
     header = (
         '*This file, part of the* [SdePy](https://github.com/sdepy/sdepy) '
         '*package*,\n',
-        '*was automatically generated from* `{}`\n'.format(in_),
+        f'*was automatically generated from* `{in_}`\n',
         '\n',
-        '-----------------------------------------------\n')
+        '-----------------------------------------------\n',
+    )
     getnotebook(in_=in_, out=out_code,
                 skip=1,  # skip initial '==========='
                 header=header,
@@ -166,6 +164,7 @@ def quickguide_make(execute=True):
                 x.replace('# doctest: +SKIP', '').rstrip() + '\n',
                 )
     if execute:
+        out_executed = './dist/quickguide.ipynb'
         execute_notebook(in_=out_code,
                          out=out_executed)
 

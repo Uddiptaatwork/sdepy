@@ -128,10 +128,7 @@ ARGS[sp.kou_log_pdf] = \
 # ------------------------
 
 def test_warnings():
-    if False:
-        # raises a warning in python 3.9
-        # (used to test runtests.py script with warnings=='fail')
-        math.factorial(10.)
+    pass
 
 
 def test_analytical():
@@ -218,13 +215,13 @@ def analytical(f, tshape, xushape, params_shape, nvar, hw2f):
     # generate variables and parameters values
     def make(shape):
         return 0.1*rng().random(shape)
+
     t = 1 + make(tshape)
     xu = 1 + make(xushape)
     if hw2f:
         params = {k: default[0] + make(params_shape)
                   for k, default in args.items() if k != 'rho'}
         params['rho'] = 1.
-        pass
     else:
         params = {k: default + 0.1*make(params_shape)
                   for k, default in args.items()}
